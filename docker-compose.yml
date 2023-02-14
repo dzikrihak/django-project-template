@@ -1,0 +1,66 @@
+version: '3'
+
+volumes:
+  database:
+    external: false
+
+services:
+  database:
+    image: postgres:14.4
+    environment:
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - database:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  redis:
+    image: redis:6.2-alpine
+    ports:
+      - "6379:6379"
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: dev_web_start
+    entrypoint: /src/docker-entrypoint.sh
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://postgres:password@database:5432/postgres
+      - DJANGO_SETTINGS_MODULE=config.settings.local
+    restart: on-failure
+    volumes:
+      - .:/src
+    ports:
+      - 8000:8000
+    links:
+      - database:database
+      - redis:redis
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: dev_worker_start
+    entrypoint: /src/docker-entrypoint.sh
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://postgres:password@database:5432/postgres
+      - DJANGO_SETTINGS_MODULE=config.settings.local
+    volumes:
+      - .:/src
+    links:
+      - database:database
+      - redis:redis
+
+  tailwind:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/src
+    command: dev_tailwind_start
+    entrypoint: /src/docker-entrypoint.sh
+    restart: unless-stopped
+    tty: true
